@@ -183,6 +183,276 @@ def status():
         "code_types": ["forever", "month", "week", "day"]
     })
 
+# 👇 ДОБАВЛЯЕМ АДМИН-ПАНЕЛЬ С ФОРМОЙ
+@app.route('/admin', methods=['GET'])
+def admin_panel():
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Admin Panel - Activation Codes</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #333;
+                border-bottom: 2px solid #4CAF50;
+                padding-bottom: 10px;
+            }
+            .section {
+                margin: 30px 0;
+                padding: 20px;
+                background: #f9f9f9;
+                border-radius: 8px;
+            }
+            input, select, button {
+                padding: 12px;
+                margin: 8px 0;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+            }
+            input {
+                width: 300px;
+            }
+            select {
+                width: 150px;
+            }
+            button {
+                background: #4CAF50;
+                color: white;
+                border: none;
+                cursor: pointer;
+                padding: 12px 24px;
+                font-weight: bold;
+            }
+            button:hover {
+                background: #45a049;
+            }
+            .result {
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+                display: none;
+            }
+            .success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .code-list {
+                background: white;
+                padding: 15px;
+                border-radius: 5px;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .code-item {
+                padding: 10px;
+                margin: 5px 0;
+                border-left: 4px solid #4CAF50;
+                background: #f9f9f9;
+            }
+            .used {
+                border-left-color: #dc3545;
+                opacity: 0.7;
+            }
+            .expired {
+                border-left-color: #ffc107;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔧 Панель управления кодами</h1>
+            
+            <div class="section">
+                <h2>➕ Добавить новый код</h2>
+                <input type="text" id="newCode" placeholder="Введите код (например: ABC123DEF)">
+                <select id="codeType">
+                    <option value="forever">Навсегда</option>
+                    <option value="month">На месяц</option>
+                    <option value="week">На неделю</option>
+                    <option value="day">На день</option>
+                </select>
+                <button onclick="addCode()">Добавить код</button>
+                <div id="addResult" class="result"></div>
+            </div>
+            
+            <div class="section">
+                <h2>✅ Проверить код</h2>
+                <input type="text" id="checkCode" placeholder="Введите код для проверки">
+                <button onclick="checkCode()">Проверить код</button>
+                <div id="checkResult" class="result"></div>
+            </div>
+            
+            <div class="section">
+                <h2>📋 Все коды в системе</h2>
+                <button onclick="loadCodes()">Обновить список</button>
+                <div id="codesList" class="code-list">
+                    <!-- Коды появятся здесь -->
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📊 Статистика</h2>
+                <div id="stats">
+                    <p>Всего кодов: <span id="totalCodes">0</span></p>
+                    <p>Использовано: <span id="usedCodes">0</span></p>
+                    <p>Активных: <span id="activeCodes">0</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            const API_BASE = window.location.origin;
+            
+            async function addCode() {
+                const code = document.getElementById('newCode').value.trim();
+                const type = document.getElementById('codeType').value;
+                const resultDiv = document.getElementById('addResult');
+                
+                if (!code) {
+                    showResult(resultDiv, 'Введите код!', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(API_BASE + '/api/admin/add_code', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({code: code, code_type: type})
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showResult(resultDiv, `✅ ${data.message}`, 'success');
+                        document.getElementById('newCode').value = '';
+                        loadCodes();
+                    } else {
+                        showResult(resultDiv, `❌ ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    showResult(resultDiv, '❌ Ошибка подключения к серверу', 'error');
+                }
+            }
+            
+            async function checkCode() {
+                const code = document.getElementById('checkCode').value.trim();
+                const resultDiv = document.getElementById('checkResult');
+                
+                if (!code) {
+                    showResult(resultDiv, 'Введите код для проверки!', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(API_BASE + '/api/check_code', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({activation_code: code})
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        let message = `✅ ${data.message}`;
+                        if (data.expires_at) {
+                            message += `<br>⏰ Истекает: ${new Date(data.expires_at).toLocaleString()}`;
+                        }
+                        showResult(resultDiv, message, 'success');
+                    } else {
+                        showResult(resultDiv, `❌ ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    showResult(resultDiv, '❌ Ошибка подключения к серверу', 'error');
+                }
+            }
+            
+            async function loadCodes() {
+                try {
+                    const response = await fetch(API_BASE + '/api/admin/list_codes');
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        const codesList = document.getElementById('codesList');
+                        const stats = calculateStats(data.codes);
+                        
+                        codesList.innerHTML = data.codes.map(code => `
+                            <div class="code-item ${code.used ? 'used' : ''}">
+                                <strong>${code.code}</strong><br>
+                                Тип: ${getTypeName(code.type)} | 
+                                Создан: ${new Date(code.created).toLocaleDateString()} |
+                                ${code.expires ? `Истекает: ${new Date(code.expires).toLocaleDateString()}` : 'Бессрочный'} |
+                                Статус: ${code.used ? '🟥 Использован' : '🟢 Активен'}
+                            </div>
+                        `).join('');
+                        
+                        updateStats(stats);
+                    }
+                } catch (error) {
+                    console.error('Ошибка загрузки кодов:', error);
+                }
+            }
+            
+            function calculateStats(codes) {
+                const total = codes.length;
+                const used = codes.filter(c => c.used).length;
+                const active = total - used;
+                
+                return { total, used, active };
+            }
+            
+            function updateStats(stats) {
+                document.getElementById('totalCodes').textContent = stats.total;
+                document.getElementById('usedCodes').textContent = stats.used;
+                document.getElementById('activeCodes').textContent = stats.active;
+            }
+            
+            function getTypeName(type) {
+                const types = {
+                    'forever': 'Навсегда',
+                    'month': 'Месяц',
+                    'week': 'Неделя',
+                    'day': 'День'
+                };
+                return types[type] || type;
+            }
+            
+            function showResult(element, message, type) {
+                element.innerHTML = message;
+                element.className = `result ${type}`;
+                element.style.display = 'block';
+                
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, 5000);
+            }
+            
+            // Загружаем коды при открытии страницы
+            loadCodes();
+        </script>
+    </body>
+    </html>
+    '''
+
 @app.route('/')
 def home():
     return '''
@@ -195,12 +465,15 @@ def home():
             .container { max-width: 800px; margin: 0 auto; }
             .endpoint { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
             code { background: #e0e0e0; padding: 2px 5px; }
+            .btn { background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>🔑 Activation API</h1>
             <p>API для активации кодов с разными сроками действия</p>
+            
+            <a href="/admin" class="btn">📊 Панель управления кодами</a>
             
             <div class="endpoint">
                 <h3>📡 Проверить статус API</h3>
