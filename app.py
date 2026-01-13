@@ -6,29 +6,15 @@ from functools import wraps
 
 app = Flask(__name__)
 
-# ============================================
-# КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ
-# ============================================
-
-# Пароль берется из переменных окружения Render
-# Если переменной нет, используем дефолтный (только для разработки)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'CHANGE_THIS_IN_PRODUCTION')
 
-# Проверка что пароль не дефолтный
 if ADMIN_PASSWORD == 'CHANGE_THIS_IN_PRODUCTION':
-    print("⚠️  ВНИМАНИЕ: Используется дефолтный пароль! Добавьте ADMIN_PASSWORD в переменные окружения.")
-
-# ============================================
-# ФУНКЦИИ ДЛЯ АУТЕНТИФИКАЦИИ
-# ============================================
+    print("ВНИМАНИЕ: Используется дефолтный пароль! Добавьте ADMIN_PASSWORD в переменные окружения.")
 
 def check_admin_auth(username, password):
-    """Проверка пароля админа"""
-    # Имя пользователя может быть любое, проверяем только пароль
     return password == ADMIN_PASSWORD
 
 def requires_auth(f):
-    """Декоратор для защиты страниц"""
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
@@ -40,10 +26,6 @@ def requires_auth(f):
             )
         return f(*args, **kwargs)
     return decorated
-
-# ============================================
-# БАЗА ДАННЫХ
-# ============================================
 
 DB_PATH = '/tmp/activation_codes.db'
 
@@ -147,13 +129,8 @@ def add_test_codes():
     for code, code_type in test_codes:
         add_code_with_type(code, code_type)
 
-# ============================================
-# API ЭНДПОИНТЫ (публичные)
-# ============================================
-
 @app.route('/api/check_code', methods=['POST'])
 def check_code():
-    """Публичный endpoint для проверки кодов"""
     try:
         data = request.get_json()
         if not data or 'activation_code' not in data:
@@ -172,21 +149,15 @@ def check_code():
 
 @app.route('/api/status', methods=['GET'])
 def status():
-    """Публичный endpoint для проверки статуса API"""
     return jsonify({
         "status": "active", 
         "service": "Activation API",
         "code_types": ["forever", "month", "week", "day"]
     })
 
-# ============================================
-# АДМИН ЭНДПОИНТЫ (защищенные)
-# ============================================
-
 @app.route('/api/admin/add_code', methods=['POST'])
 @requires_auth
 def add_code():
-    """Защищенный endpoint для добавления кодов"""
     try:
         data = request.get_json()
         if not data or 'code' not in data:
@@ -214,7 +185,6 @@ def add_code():
 @app.route('/api/admin/list_codes', methods=['GET'])
 @requires_auth
 def list_codes():
-    """Защищенный endpoint для просмотра всех кодов"""
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -237,14 +207,9 @@ def list_codes():
     except Exception as e:
         return jsonify({"status": "error", "message": f"Error: {str(e)}"}), 500
 
-# ============================================
-# ВЕБ-ИНТЕРФЕЙСЫ
-# ============================================
-
 @app.route('/admin')
 @requires_auth
 def admin_panel():
-    """Защищенная админ-панель"""
     return '''
     <!DOCTYPE html>
     <html>
@@ -363,7 +328,6 @@ def admin_panel():
                 }, 3000);
             }
             
-            // Загружаем коды при открытии
             loadCodes();
         </script>
     </body>
@@ -372,7 +336,6 @@ def admin_panel():
 
 @app.route('/')
 def home():
-    """Главная страница (публичная)"""
     return '''
     <!DOCTYPE html>
     <html>
@@ -406,10 +369,6 @@ def home():
     </body>
     </html>
     '''
-
-# ============================================
-# ЗАПУСК СЕРВЕРА
-# ============================================
 
 init_db()
 add_test_codes()
